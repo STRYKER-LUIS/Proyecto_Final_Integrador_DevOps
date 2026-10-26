@@ -105,7 +105,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Construir imagen de API
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: backend/Dockerfile
@@ -117,7 +117,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=api
 
       - name: Construir imagen web
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: frontend/Dockerfile
@@ -241,7 +241,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Construir y publicar
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
