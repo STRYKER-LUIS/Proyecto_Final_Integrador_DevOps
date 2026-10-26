@@ -14,7 +14,7 @@ RUN npm ci
 COPY frontend ./frontend
 RUN npm run build -w frontend
 
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS production
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS production
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 
