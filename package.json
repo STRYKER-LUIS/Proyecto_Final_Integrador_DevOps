@@ -1,0 +1,56 @@
+{
+  "name": "it-incident-hub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plataforma de gestión y trazabilidad de incidentes de TI con enfoque DevOps",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c cyan,magenta \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w backend && npm run test -w frontend",
+    "audit:prod": "npm audit --omit=dev --omit=optional --audit-level=high",
+    "test:e2e": "vitest run --config vitest.e2e.config.mts",
+    "pretest:e2e": "node scripts/e2e-prepare.mjs",
+    "db:generate": "npm run db:generate -w backend",
+    "db:migrate": "npm run db:migrate -w backend",
+    "db:deploy": "npm run db:deploy -w backend",
+    "db:seed": "npm run db:seed -w backend",
+    "db:reset": "npm run db:reset -w backend",
+    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed",
+    "docker:env": "node scripts/docker-env.mjs",
+    "docker:up": "node scripts/docker-env.mjs && docker compose --env-file .env.docker up --build -d",
+    "docker:down": "docker compose --env-file .env.docker down",
+    "docker:logs": "docker compose --env-file .env.docker logs -f --tail=200",
+    "docker:seed": "docker compose --env-file .env.docker --profile tools run --rm seed",
+    "docker:config": "node scripts/docker-env.mjs && docker compose --env-file .env.docker config --quiet",
+    "db:dev:up": "docker compose -f docker-compose.dev.yml up -d --wait",
+    "db:dev:down": "docker compose -f docker-compose.dev.yml down",
+    "db:dev:reset": "docker compose -f docker-compose.dev.yml down -v"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.0"
+    },
+    "deepmerge-ts": "8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/supertest": "7.2.1",
+    "concurrently": "10.0.6",
+    "deepmerge-ts": "8.0.0",
+    "dotenv": "16.6.1",
+    "supertest": "7.3.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

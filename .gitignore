@@ -1,0 +1,47 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Compilados
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+!.env.docker.example
+backend/.env
+frontend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env.example
+
+# Prisma
+database/prisma/*.db
+database/prisma/*.db-journal
+database/prisma/migrations/**/migration_lock.toml.bak
+
+# Tests y herramientas
+.playwright/
+.vitest/
+test-results/
+*.log
+logs/
+
+# Editor y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker
+docker-compose.override.yml
+
+# Archivos temporales
+tmp/
+temp/
+*.tmp

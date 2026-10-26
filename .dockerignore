@@ -1,0 +1,37 @@
+# Dependencias y artefactos locales
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+**/coverage
+*.tsbuildinfo
+
+# Secretos y configuración local
+.env
+.env.*
+!.env.docker.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Control de versiones, CI y documentación
+.git
+.github
+.vscode
+.idea
+*.md
+docs
+audit*.json
+
+# Pruebas que no participan del build
+tests
+backend/tests
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+
+# Archivos temporales
+*.log
+tmp
+temp

@@ -1,0 +1,255 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24"
+  DATABASE_URL: postgresql://incidenthub:incidenthub@localhost:5432/incidenthub?schema=public
+
+jobs:
+  quality:
+    name: Calidad, pruebas y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar cliente Prisma
+        run: npm run db:generate
+
+      - name: Verificar tipos
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Pruebas unitarias y de integración
+        run: npm test
+
+      - name: Build de producción
+        run: npm run build
+
+      - name: Auditar dependencias de producción
+        run: npm run audit:prod
+
+  e2e:
+    name: E2E con PostgreSQL real
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: incidenthub_test
+          POSTGRES_USER: incidenthub
+          POSTGRES_PASSWORD: incidenthub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U incidenthub -d incidenthub_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://incidenthub:incidenthub@localhost:5432/incidenthub_test?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar cliente Prisma
+        run: npm run db:generate
+
+      - name: Ejecutar suite E2E
+        run: npm run test:e2e
+
+  docker:
+    name: Build de imágenes y validación Compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configurar Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir imagen de API
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          target: production
+          push: false
+          load: true
+          tags: incident-hub-api:ci
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Construir imagen web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          target: production
+          push: false
+          load: true
+          tags: incident-hub-web:ci
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Validar Compose
+        run: |
+          node scripts/docker-env.mjs
+          docker compose --env-file .env.docker config --quiet
+
+  docker-smoke:
+    name: Smoke test del stack Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [quality, e2e]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Generar entorno Docker
+        run: node scripts/docker-env.mjs
+
+      - name: Levantar el stack
+        run: docker compose --env-file .env.docker up --build -d
+
+      - name: Sembrar datos de demostración
+        run: docker compose --env-file .env.docker --profile tools run --rm seed
+
+      - name: Verificar salud y autenticación
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/healthz >/dev/null \
+              && curl -fsS http://localhost:8080/health/ready >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+
+          curl -fsS http://localhost:8080/ | grep -q '<div id="root">'
+
+          curl -fsS -D /tmp/login-headers -o /tmp/login.json \
+            -X POST http://localhost:8080/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"admin@incidenthub.dev","password":"Admin123!"}'
+
+          grep -qi 'set-cookie: ih_refresh=.*HttpOnly' /tmp/login-headers
+          jq -e '.user.role == "ADMIN" and (.accessToken | length > 20)' /tmp/login.json
+
+      - name: Mostrar logs
+        if: always()
+        run: docker compose --env-file .env.docker logs --no-color
+
+      - name: Apagar el stack
+        if: always()
+        run: docker compose --env-file .env.docker down -v
+
+  dependency-review:
+    name: Revisión de dependencias
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  publish:
+    name: Publicar ${{ matrix.image }} en GHCR
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    needs: [quality, e2e, docker, docker-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+            dockerfile: backend/Dockerfile
+          - image: web
+            dockerfile: frontend/Dockerfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Calcular prefijo de imagen
+        run: echo "IMAGE_PREFIX=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Iniciar sesión en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadatos de la imagen
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Configurar Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir y publicar
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
