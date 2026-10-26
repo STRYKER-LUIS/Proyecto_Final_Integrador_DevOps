@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Etapa común para instalar dependencias del monorepo.
-FROM node:24-bookworm-slim AS base
+FROM node:26-bookworm-slim AS base
 ENV NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_UPDATE_NOTIFIER=false
@@ -33,7 +33,7 @@ USER node
 CMD ["node", "node_modules/tsx/dist/cli.mjs", "database/seeds/seed.ts"]
 
 # Imagen final: solo dependencias de producción, cliente Prisma generado y dist.
-FROM node:24-bookworm-slim AS production
+FROM node:26-bookworm-slim AS production
 ENV NODE_ENV=production \
     PORT=4000 \
     PRISMA_SKIP_POSTINSTALL_GENERATE=true \
