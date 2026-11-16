@@ -44,13 +44,13 @@
   "devDependencies": {
     "@types/node": "24.19.2",
     "@types/supertest": "7.2.1",
-    "concurrently": "10.0.6",
+    "concurrently": "10.0.7",
     "deepmerge-ts": "8.0.0",
     "dotenv": "16.6.1",
-    "supertest": "7.3.1",
+    "supertest": "7.3.2",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
   }
 }
