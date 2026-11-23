@@ -13,13 +13,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tanstack/react-query": "5.104.5",
-    "axios": "1.20.0",
-    "lucide-react": "1.61.0",
+    "@tanstack/react-query": "5.108.1",
+    "axios": "1.21.1",
+    "lucide-react": "1.77.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "react-router-dom": "7.18.4",
-    "recharts": "3.10.1"
+    "react-router-dom": "7.18.6",
+    "recharts": "3.11.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
